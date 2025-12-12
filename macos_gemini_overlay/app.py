@@ -8,7 +8,7 @@ from AppKit import *
 from WebKit import *
 from Quartz import *
 from AVFoundation import AVCaptureDevice, AVMediaTypeAudio
-from Foundation import NSObject, NSURL, NSURLRequest, NSDate
+from Foundation import NSObject, NSURL, NSURLRequest, NSDate, NSTimer
 
 # Local libraries
 from .constants import (
@@ -123,6 +123,8 @@ class AppDelegate(NSObject):
         url = NSURL.URLWithString_(WEBSITE)
         request = NSURLRequest.requestWithURL_(url)
         self.webview.loadRequest_(request)
+        # Set self as navigation delegate to know when page loads
+        self.webview.setNavigationDelegate_(self)
         # Set up script message handler for background color changes
         configuration = self.webview.configuration()
         user_content_controller = configuration.userContentController()
@@ -239,11 +241,7 @@ class AppDelegate(NSObject):
     def showWindow_(self, sender):
         self.window.makeKeyAndOrderFront_(None)
         NSApp.activateIgnoringOtherApps_(True)
-        # Execute the JavaScript to focus the textarea in the WKWebView
-        self.webview.evaluateJavaScript_completionHandler_(
-            "[...document.querySelectorAll('textarea')].sort((a,b)=>a.contains(b)?-1:b.contains(a)?1:0).pop()?.focus();",
-            None
-        )
+        self._focus_prompt_area()
 
     # Hide the overlay and allow focus to return to the next visible application.
     def hideWindow_(self, sender):
@@ -321,9 +319,60 @@ class AppDelegate(NSObject):
             # Hide
             elif key == 'h':
                 self.hideWindow_(None)
+            # New Chat (Command+N)
+            elif key == 'n':
+                # Try to click Gemini's "New chat" button (falls back to reload)
+                js = """
+                (function(){
+                  const sel = '[aria-label="New chat"], [aria-label="New conversation"], [data-command="new-conversation"]';
+                  const btn = document.querySelector(sel);
+                  if(btn){ btn.click(); } else { location.href='https://gemini.google.com/?hl=ru'; }
+                })();
+                """
+                self.webview.evaluateJavaScript_completionHandler_(js, None)
+            # Toggle Sidebar (Ctrl+Cmd+S)
+            elif key == 's' and key_control and key_command:
+                js = """
+                (function(){
+                  const selectors=[
+                    '[aria-label="Main menu"]',
+                    '[data-test-id="side-nav-menu-button"]'
+                  ];
+                  let btn=null;
+                  for(const sel of selectors){ btn=document.querySelector(sel); if(btn) break; }
+                  if(btn){ btn.click(); }
+                })();
+                """
+                self.webview.evaluateJavaScript_completionHandler_(js, None)
             # Quit
             elif key == 'q':
                 NSApp.terminate_(None)
+            # Open Saved Info (Cmd + ,)
+            elif key == ',' and key_command and not key_control and not key_alt:
+                js = """
+                (function(){
+                  function clickSettings(){
+                    const btn=document.querySelector('[aria-label="Settings & help"], [data-test-id="settings-and-help-button"]');
+                    if(btn){ btn.click(); return true; }
+                    return false;
+                  }
+                  function clickSaved(){
+                    let link=document.querySelector('a[href*="/saved-info"]');
+                    if(!link){
+                      // fallback: find menu item whose text includes "Saved info"
+                      const items=document.querySelectorAll('a[role="menuitem"], button[role="menuitem"]');
+                      for(const el of items){
+                        if(el.textContent && el.textContent.trim().toLowerCase().includes('saved info')){ link=el; break; }
+                      }
+                    }
+                    if(link){ link.click(); }
+                  }
+                  if(clickSettings()){
+                    setTimeout(clickSaved, 50);
+                  }
+                })();
+                """
+                self.webview.evaluateJavaScript_completionHandler_(js, None)
             # # Undo (causes crash for some reason)
             # elif key == 'z':
             #     self.window.firstResponder().undo_(None)
@@ -380,3 +429,26 @@ class AppDelegate(NSObject):
     def appearanceDidChange_(self, notification):
         # Update the logo image when the system appearance changes
         self.updateStatusItemImage()
+
+    # WKNavigationDelegate – called when navigation finishes
+    def webView_didFinishNavigation_(self, webview, navigation):
+        # Page loaded, focus prompt area after small delay to ensure textarea exists
+        # Delay 0.1 s, then focus prompt (use NSTimer – PyObjC provides selector call)
+        NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            0.1, self, '_focusPromptTimerFired:', None, False)
+
+    # Helper called by timer
+    def _focusPromptTimerFired_(self, timer):
+        self._focus_prompt_area()
+
+    # Python method to call JS that focuses the Gemini textarea / prompt
+    @objc.python_method
+    def _focus_prompt_area(self):
+        js_focus = """
+        (function(){
+          const sel='[aria-label=\\"Enter a prompt here\\"], [data-placeholder=\\"Ask Gemini\\"]';
+          const el=document.querySelector(sel) || document.querySelector('textarea');
+          if(el){ el.focus(); }
+        })();
+        """
+        self.webview.evaluateJavaScript_completionHandler_(js_focus, None)

@@ -3,7 +3,7 @@
 # Minimal local build (no signing/notarization)
 set -euo pipefail
 
-APP_NAME="macos-grok-overlay"
+APP_NAME="macos-gemini-overlay"
 
 # Determine which architecture(s) to target (defaults to universal binary).
 PY2APP_ARCH=${PY2APP_ARCH:-universal2}
@@ -35,7 +35,7 @@ pushd .. >/dev/null
 python setup.py py2app --arch "$PY2APP_ARCH" --dist-dir="dmg-builder/dist" --bdist-base="dmg-builder/build"
 # Ad-hoc sign just the bundle (skip strict validation on nested libs).
 echo "Code signing the local .app so that permission settings work as expected."
-codesign --force --sign - dmg-builder/dist/macos-grok-overlay.app
+codesign --force --sign - dmg-builder/dist/macos-gemini-overlay.app
 
 # Exit the directory.
 popd >/dev/null

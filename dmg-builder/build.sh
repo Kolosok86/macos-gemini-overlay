@@ -40,7 +40,7 @@
 # # Profile name is arbitrary
 # KEYCHAIN_PROFILE="macos-2025"
 # # The name of the app
-# APP_NAME="macos-grok-overlay"
+# APP_NAME="macos-gemini-overlay"
 # 
 # ---------------------------------------------------------------------
 
@@ -61,7 +61,7 @@ case "$PY2APP_ARCH" in
         exit 1
         ;;
 esac
-echo "Building macos-grok-overlay for architecture: $PY2APP_ARCH"
+echo "Building macos-gemini-overlay for architecture: $PY2APP_ARCH"
 
 # Create a build environment
 touch temp.egg-info

@@ -1,5 +1,5 @@
 """
-macOS Grok Overlay - A macOS overlay app for Grok.
+macOS gemini Overlay - A macOS overlay app for gemini.
 """
 
 import os
